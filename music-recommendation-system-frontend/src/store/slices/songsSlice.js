@@ -13,6 +13,11 @@ const songsSlice = createSlice({
 
 export const { setSongs } = songsSlice.actions;
 
+/**
+ * Fetches song recommendations for a user.
+ * If filters are provided (genre/mood), calls filtered endpoint.
+ * Otherwise, fetches general time-of-day based recommendations.
+ */
 export const fetchSongs = (userId, filters) => async (dispatch) => {
     try {
         let response;
@@ -27,7 +32,9 @@ export const fetchSongs = (userId, filters) => async (dispatch) => {
     }
 };
 
-
+/**
+ * Sends a free-form natural language query to get song recommendations.
+ */
 export const fetchSearchResults = (query) => async (dispatch) => {
     try {
         const response = await axios.post(`http://127.0.0.1:8000/api/recommendations/search/`,  { query });

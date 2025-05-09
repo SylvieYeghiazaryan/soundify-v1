@@ -4,6 +4,10 @@ import { Card, Typography } from "antd";
 
 const { Text } = Typography;
 
+/**
+ * Displays a grid of song cards fetched from the Redux store.
+ * Shows "No songs available" if the list is empty.
+ */
 const SongList = () => {
     const songs = useSelector((state) => state.songs.list);
 

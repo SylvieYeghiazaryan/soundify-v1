@@ -9,12 +9,17 @@ import { CustomerServiceOutlined, PlayCircleOutlined } from "@ant-design/icons";
 
 const { Title } = Typography;
 
+/**
+ * Main component for displaying song recommendations.
+ * Fetches personalized or filtered recommendations for the logged-in user.
+ */
 const Recommendations = () => {
     const userId = useSelector((state) => state.auth.userId);
     const dispatch = useDispatch();
     const [genre, setGenre] = useState("");
     const [mood, setMood] = useState("");
 
+    // Fetch songs when userId or filters change
     useEffect(() => {
         if (userId) {
             dispatch(fetchSongs(userId, { genre, mood }));

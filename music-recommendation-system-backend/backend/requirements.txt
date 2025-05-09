@@ -1,0 +1,5 @@
+Django>=3.2,<4.0
+djangorestframework>=3.12,<4.0
+django-cors-headers>=3.7,<4.0
+openai>=0.27,<1.0
+python-dotenv>=0.19,<1.0

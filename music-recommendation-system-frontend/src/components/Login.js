@@ -6,11 +6,19 @@ import { PlayCircleOutlined, CustomerServiceOutlined } from '@ant-design/icons';
 
 const { Title } = Typography;
 
+
+/**
+ * The Login component provides a form where users can log in with their username and password.
+ * Upon submission, it dispatches the login action to authenticate the user.
+ */
 const Login = () => {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const dispatch = useDispatch();
 
+    /**
+     * Handles form submission. Dispatches the login action with username and password.
+     */
     const handleSubmit = () => {
         dispatch(login(username, password));
     };

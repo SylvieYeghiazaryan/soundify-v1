@@ -11,13 +11,19 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from .models import User, ListeningHistory
 
-client = OpenAI()
-
+# Load OpenAI API key
 load_dotenv()
-
+client = OpenAI()
 client.api_key = os.getenv('OPENAI_API_KEY')
 
+
 def get_time_of_day():
+    """
+    Determines the current time of day.
+
+    Returns:
+        str: One of "Morning", "Afternoon", or "Evening".
+    """
     current_hour = now().hour
     if current_hour < 12:
         return "Morning"
@@ -25,7 +31,20 @@ def get_time_of_day():
         return "Afternoon"
     return "Evening"
 
+
 class LoginView(APIView):
+    """
+    API endpoint for user login authentication.
+
+    POST:
+        - username: str
+        - password: str
+
+    Returns:
+        - 200 OK with user_id if credentials are valid.
+        - 400 Bad Request if invalid credentials.
+    """
+
     def post(self, request):
         username = request.data.get("username")
         password = request.data.get("password")
@@ -35,24 +54,40 @@ class LoginView(APIView):
             return Response({"user_id": user.id}, status=status.HTTP_200_OK)
         return Response({"error": "Invalid credentials"}, status=status.HTTP_400_BAD_REQUEST)
 
+
 class RecommendationView(APIView):
+    """
+    API endpoint for recommending songs based on user's listening history
+    at the current time of day (Morning, Afternoon, Evening).
+
+    GET:
+        - user_id: int
+
+    Returns:
+        - 200 OK with a list of recommended songs in JSON.
+        - 400 if recommendation parsing fails.
+    """
+
     def get(self, request, user_id):
-        """Fetches song recommendations based on listening history for the same time of day."""
         user = get_object_or_404(User, id=user_id)
         current_time_of_day = get_time_of_day()
 
-        # Retrieve last 20 songs listened during this time of day
+        # Filter last 20 songs and retain only those from the current time of day
         history = ListeningHistory.objects.filter(user=user).order_by("-listened_at")[:20]
         songs = [h.song for h in history if h.time_of_day() == current_time_of_day]
 
-        # If no history, ask LLM to generate general recommendations
+        # Construct LLM prompt
         if not songs:
-            prompt = f"This is a music recommender system. The user has no recent listening history at this time. " \
-                     f"Please recommend 20 songs that are generally popular and diverse across different genres and moods in JSON format."
+            prompt = (
+                f"This is a music recommender system. The user has no recent listening history at this time. "
+                f"Please recommend 20 songs that are generally popular and diverse across different genres and moods in JSON format."
+            )
         else:
-            prompt = f"This is a music recommender system. The user has listened to these songs in the {current_time_of_day}: " \
-                     f"{', '.join([f'{s.title} by {s.artist}' for s in songs])}. " \
-                     f"Recommend 20 similar songs in JSON format."
+            song_list = ', '.join([f"{s.title} by {s.artist}" for s in songs])
+            prompt = (
+                f"This is a music recommender system. The user has listened to these songs in the {current_time_of_day}: "
+                f"{song_list}. Recommend 20 similar songs in JSON format."
+            )
 
         response = client.chat.completions.create(
             model="gpt-4o",
@@ -63,9 +98,8 @@ class RecommendationView(APIView):
         start_index = recommendations.find("[")
         end_index = recommendations.rfind("]") + 1
 
-        recommendations = recommendations[start_index:end_index]
         try:
-            recommendations = json.loads(recommendations)
+            recommendations = json.loads(recommendations[start_index:end_index])
         except json.JSONDecodeError:
             return Response({"error": "Failed to parse recommendations as JSON"}, status=400)
 
@@ -73,8 +107,20 @@ class RecommendationView(APIView):
 
 
 class FilteredRecommendationView(APIView):
+    """
+    API endpoint for song recommendations filtered by genre, mood, or both.
+
+    GET:
+        - user_id: int
+        - genre: str (optional)
+        - mood: str (optional)
+
+    Returns:
+        - 200 OK with filtered recommendations.
+        - 400 if no filters or JSON parsing fails.
+    """
+
     def get(self, request, user_id):
-        """Filters recommendations based on genre, mood, or both."""
         user = get_object_or_404(User, id=user_id)
         genre = request.query_params.get("genre")
         mood = request.query_params.get("mood")
@@ -91,8 +137,9 @@ class FilteredRecommendationView(APIView):
         history = history.order_by("-listened_at")[:20]
         songs = [h.song for h in history]
 
+        # Construct prompt for LLM
         if not songs:
-            prompt = f"This is a music recommender system. "
+            prompt = "This is a music recommender system. "
             if genre:
                 prompt += f"The user prefers the genre {genre}. "
             if mood:
@@ -100,7 +147,7 @@ class FilteredRecommendationView(APIView):
             prompt += "Recommend 20 songs that match these preferences in JSON format."
         else:
             song_list = ', '.join([f"{s.title} by {s.artist}" for s in songs])
-            prompt = f"This is a music recommender system. "
+            prompt = "This is a music recommender system. "
             if genre:
                 prompt += f"The user enjoys the genre {genre}. "
             if mood:
@@ -116,27 +163,38 @@ class FilteredRecommendationView(APIView):
         start_index = recommendations.find("[")
         end_index = recommendations.rfind("]") + 1
 
-        recommendations = recommendations[start_index:end_index]
         try:
-            recommendations = json.loads(recommendations)
+            recommendations = json.loads(recommendations[start_index:end_index])
         except json.JSONDecodeError:
             return Response({"error": "Failed to parse recommendations as JSON"}, status=400)
 
         return Response({"recommended_songs": recommendations}, status=200)
 
+
 class SearchRecommendationView(APIView):
+    """
+    API endpoint for generating recommendations using a natural language query.
+
+    POST:
+        - query: str (e.g., "Relaxing music for evening walks")
+
+    Returns:
+        - 200 OK with song recommendations based on query.
+        - 400 if query is missing or parsing fails.
+    """
     permission_classes = [AllowAny]
     parser_classes = [JSONParser]
 
     def post(self, request):
-        """Allows user to search for songs using a natural language prompt."""
         query = request.data.get("query", "")
 
         if not query:
             return Response({"error": "Query is required."}, status=400)
 
-        prompt = f"This is a music recommender system. The user asks: '{query}'. " \
-                 f"Provide up to 20 relevant song recommendations in JSON format."
+        prompt = (
+            f"This is a music recommender system. The user asks: '{query}'. "
+            f"Provide up to 20 relevant song recommendations in JSON format."
+        )
 
         response = client.chat.completions.create(
             model="gpt-4o",
@@ -147,9 +205,8 @@ class SearchRecommendationView(APIView):
         start_index = recommendations.find("[")
         end_index = recommendations.rfind("]") + 1
 
-        recommendations = recommendations[start_index:end_index]
         try:
-            recommendations = json.loads(recommendations)
+            recommendations = json.loads(recommendations[start_index:end_index])
         except json.JSONDecodeError:
             return Response({"error": "Failed to parse recommendations as JSON"}, status=400)
 
