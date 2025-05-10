@@ -1,7 +1,3 @@
-Here’s an updated **README.md** with the setup steps included:
-
----
-
 # Soundify (Synthetic Data Version) 🎧
 
 **LLM-Powered Music Recommendation System – Synthetic Prototype**
